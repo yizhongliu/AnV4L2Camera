@@ -336,10 +336,9 @@ std::list<Parameter> V4L2Camera::getParameters() {
         {
             frmsize.index = j;
             frmsize.pixel_format = fmtd.pixelformat;
-            //fmtd.pixelformat 四字符代码（不知道是什么鬼，总之是识别图片格式）
             if (ioctl(fd, VIDIOC_ENUM_FRAMESIZES, &frmsize) < 0)
                 break;
-            ALOGD("w = %d, h = %d\n", frmsize.discrete.width, frmsize.discrete.height);
+            ALOGD("w = %d, h = %d \n", frmsize.discrete.width, frmsize.discrete.height);
 
             frame.width = frmsize.discrete.width;
             frame.height = frmsize.discrete.height;
@@ -438,7 +437,7 @@ void V4L2Camera::renderVideo(unsigned char *preview) {
     if (window == 0) {
         return;
     }
-//    ALOGE("RenderVideoElement width:%d, height:%d", width,height);
+    ALOGE("RenderVideoElement width:%d, height:%d", width,height);
     ANativeWindow_setBuffersGeometry(window, width,
                                      height,
                                      WINDOW_FORMAT_RGBA_8888);
@@ -479,7 +478,9 @@ void V4L2Camera::sendDataToJava(unsigned char *raw) {
             break;
     }
 
-    ALOGD("pixFormat %d, size : %d", pixelformat, size);
+    ALOGD("pixel'yuyv'    :%d\n",('Y'|'U'<<8|'Y'<<16|'V'<<24));
+
+    ALOGD("pixFormat %d, size : %d  ", pixelformat, size);
     if (listener != 0 && size != 0) {
         listener->onDataCallback(raw, size, width, height, format);
     }

@@ -192,7 +192,7 @@ static int registerNativeMethods(JNIEnv* env, const char* className, JNINativeMe
 
 static int register_native_methods(JNIEnv* env){
     //指定类的路径，通过FindClass 方法来找到对应的类
-    const char* className  = "com/iview/camera/module/V4L2Camera";
+    const char* className  = "pri/tool/v4l2camera/V4L2Camera";
 
     return registerNativeMethods(env, className, gMethods, sizeof(gMethods)/ sizeof(gMethods[0]));
 }

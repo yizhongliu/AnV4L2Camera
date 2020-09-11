@@ -21,8 +21,8 @@ public class V4L2CameraActivity extends Activity {
     AutoFitSurfaceView surfaceView;
     SurfaceHolder surfaceHolder;
 
-    private int previewWidth;
-    private int previewHeight;
+    private int previewWidth = 1920;
+    private int previewHeight = 1080;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,6 +76,7 @@ public class V4L2CameraActivity extends Activity {
             if (chooseSize != null) {
                 previewWidth = chooseSize.getWidth();
                 previewHeight = chooseSize.getHeight();
+
             }
 
             runOnUiThread(new Runnable() {

@@ -157,7 +157,7 @@ public class V4L2Camera{
             }
         }
 
-        Log.i(TAG, "Desired size: " + desiredSize + ", min size: " + minSize + "x" + minSize);
+        Log.i(TAG, "Desired size: " + desiredSize.toString() + ", min size: " + minSize + "x" + minSize);
         Log.i(TAG, "Valid preview sizes: [" + TextUtils.join(", ", bigEnough) + "]");
         Log.i(TAG, "Rejected preview sizes: [" + TextUtils.join(", ", tooSmall) + "]");
 
@@ -209,7 +209,7 @@ public class V4L2Camera{
 
     //Jni 层回调的函数
     private void postDataFromNative(byte[] data, int width, int height, int pixformat) {
-        Log.e(TAG, "postDataFromNative");
+        //Log.e(TAG, "postDataFromNative");
         if (dataCallback != null) {
             dataCallback.onDataCallback(data, pixformat, width, height);
         }

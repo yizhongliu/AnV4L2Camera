@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:gravity="center">
 
-    <com.iview.advertisinglogo.AutoFitSurfaceView
+    <pri.tool.anv4l2camera.AutoFitSurfaceView
         android:id="@+id/cameraSurface"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
