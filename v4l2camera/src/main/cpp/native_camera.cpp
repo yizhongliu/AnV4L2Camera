@@ -106,6 +106,12 @@ static jobject com_iview_camera_native_getParameters(JNIEnv *env, jobject thiz) 
             case V4L2_PIX_FMT_YUYV:
                 format = YUYV;
                 break;
+            case V4L2_PIX_FMT_MJPEG:
+                format = MJPEG;
+                break;
+            case V4L2_PIX_FMT_H264:
+                format = H264;
+                break;
             default:
                 format = parameter.pixFormat;
                 break;
@@ -122,7 +128,24 @@ static jint com_iview_camera_native_setPreviewSize(JNIEnv *env, jobject thiz, ji
         return ERROR_CAPABILITY_UNSUPPORT;
     }
 
-    return v4l2Camera->setPreviewSize(width, height, V4L2_PIX_FMT_YUYV);
+    int format;
+    switch (pixformat) {
+        case YUYV:
+            format = V4L2_PIX_FMT_YUYV;
+            break;
+        case MJPEG:
+            format = V4L2_PIX_FMT_MJPEG;
+            break;
+        default:
+            format = -1;
+            break;
+    }
+
+    if (format == -1) {
+        return ERROR_CAPABILITY_UNSUPPORT;
+    }
+
+    return v4l2Camera->setPreviewSize(width, height, format);
 }
 
 static int com_iview_camera_native_setSurface(JNIEnv *env, jobject thiz, jobject surface) {

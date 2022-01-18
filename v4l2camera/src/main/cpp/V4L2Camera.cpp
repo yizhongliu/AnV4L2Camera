@@ -37,6 +37,9 @@
 
 #include <android/log.h>
 #include <mutex>
+#include <libyuv/convert.h>
+#include <libyuv/convert_argb.h>
+#include <libyuv.h>
 
 //定义日志打印宏函数
 #define ALOGI(...)  __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -239,6 +242,7 @@ void V4L2Camera::StopStreaming()
 int V4L2Camera::GrabRawFrame(void *raw_base)
 {
     int ret;
+    int data_size;
 
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
@@ -251,6 +255,8 @@ int V4L2Camera::GrabRawFrame(void *raw_base)
     }
     ALOGD("copy size :%d", buf.bytesused);
 
+    data_size = buf.bytesused;
+
     /* copy to userspace */
     memcpy(raw_base, mem,  buf.bytesused);
 
@@ -261,19 +267,16 @@ int V4L2Camera::GrabRawFrame(void *raw_base)
         return ret;
     }
 
-    return 0;
+    return data_size;
 }
 
-void V4L2Camera::Convert(void *r, void *p, unsigned int ppm)
+bool WRITE_FILE = false;
+void V4L2Camera::Convert(void *r, void *p, unsigned int rSize)
 {
     unsigned char *raw = (unsigned char *)r;
     unsigned char *preview = (unsigned char *)p;
 
-    /* We don't need to really convert that */
-//    if (pixelformat == PIXEL_FORMAT_RGB_888) {
-//        /* copy to preview buffer */
-//        memcpy(preview, raw, width*height*ppm);
-//    }
+    ALOGE("Convert rSize: %d" , rSize);
 
     /* TODO: Convert YUYV to ARGB. */
     if (pixelformat == V4L2_PIX_FMT_YUYV) {
@@ -306,6 +309,35 @@ void V4L2Camera::Convert(void *r, void *p, unsigned int ppm)
             preview[out + 6] = argb & 0xff;
             preview[out + 7] = 0xff;
         }
+    } else if (pixelformat == V4L2_PIX_FMT_MJPEG) {
+        int src_width = 0;
+        int src_height = 0;
+
+        libyuv::MJPGSize(raw, rSize, &src_width, &src_height);
+
+        //经图片保存，16进制查看保存的改格式为   64 82 35 ff    --   B G R A
+        //stride 跨距, 它描述一行像素中, 该颜色分量所占的 byte 数目
+        libyuv::MJPGToARGB(raw, rSize, preview, width * 4, src_width,
+                                 src_height, width, height);
+
+#ifdef SAVE_JPEG
+        if (!WRITE_FILE) {
+            const char *path = "/sdcard/argb.bmp"; // 路径
+            bmp_write(preview, width, height, path);
+            WRITE_FILE = true;
+        }
+#endif
+
+        //WINDOW_FORMAT_RGBA_8888  排列顺序为 R G B A
+        unsigned char temp;
+        for (int i = 0; i < width * height * 4; i = i + 4) {
+            temp = preview[i+2];
+            preview[i+2] = preview[i];
+            preview[i] = temp;
+        }
+
+
+        ALOGE("MJPGToARGB: %d, %d", src_width, src_height);
     }
 
 
@@ -411,19 +443,20 @@ void V4L2Camera::setSurface(ANativeWindow *window) {
 void V4L2Camera::_start() {
     unsigned char *raw = new unsigned char[buf.length];
     ALOGE("_start raw buf.length %d", buf.length);
-    unsigned char *preview = new unsigned char[width * height * 4]; //ARGB的大小
-    int ret;
+    unsigned char *preview = new unsigned char[width * height * 4]; //RGBA的大小
 
+    int size;
+    int format = -1;
     while (start) {
-        ret = GrabRawFrame(raw);
-        if (ret != 0) {
+        size = GrabRawFrame(raw);
+        if (size < 0) {
             usleep(1000);
             continue;
         }
 
-        sendDataToJava(raw);
+        sendDataToJava(raw, size);
 
-        Convert(raw, preview, 0);
+        Convert(raw, preview, size);
 
         renderVideo(preview);
     }
@@ -463,27 +496,76 @@ void V4L2Camera::setListener(JavaCallHelper *listener) {
     this->listener = listener;
 }
 
-void V4L2Camera::sendDataToJava(unsigned char *raw) {
+void V4L2Camera::sendDataToJava(unsigned char *raw, int size) {
     std::lock_guard<std::mutex> lock(listenerLock);
-    int size = 0;
     int format = -1;
 
-    if (pixelformat == V4L2_PIX_FMT_YUYV) {
-        format = YUYV;
-    }
     switch (pixelformat) {
         case V4L2_PIX_FMT_YUYV:
-            size = width * height * 2;
             format = YUYV;
             break;
+        case V4L2_PIX_FMT_MJPEG:
+            format = MJPEG;
+            break;
     }
-
-    ALOGD("pixel'yuyv'    :%d\n",('Y'|'U'<<8|'Y'<<16|'V'<<24));
 
     ALOGD("pixFormat %d, size : %d  ", pixelformat, size);
     if (listener != 0 && size != 0) {
         listener->onDataCallback(raw, size, width, height, format);
     }
+}
+
+int V4L2Camera::bmp_write(unsigned char *image, int imageWidth, int imageHeight, const char *filename)
+{
+    /*
+     *  bmp文件头(14 bytes) + 位图信息头(40 bytes) + 调色板(由颜色索引数决定) + 位图数据(由图像尺寸决定)
+     *  0x42, 0x4d  fileType -- 相对String "BM"
+     *  0, 0, 0, 0  -- The size of the BMP file in bytes
+     *  0, 0, 0, 0  -- Reserved
+     *  54, 0, 0, 0 -- The offset, i.e. starting address, of the byte where the bitmap image data (pixel array) can be found,
+     *  40, 0, 0, 0 -- The size of this header (12 bytes)
+     *  0, 0, 0, 0  -- The bitmap width in pixels
+     *  0, 0, 0, 0  -- The bitmap height in pixels
+     *  1, 0 -- The number of color planes, must be 1
+     *  32, 0 -- The number of bits per pixel 即 RGBA 8888
+     * */
+    unsigned char header[54] = {
+            0x42, 0x4d, 0, 0, 0, 0, 0, 0, 0, 0,
+            54, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 32, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0
+    };
+
+    long file_size = (long)imageWidth * (long)imageHeight * 4 + 54;
+    header[2] = (unsigned char)(file_size &0x000000ff);
+    header[3] = (file_size >> 8) & 0x000000ff;
+    header[4] = (file_size >> 16) & 0x000000ff;
+    header[5] = (file_size >> 24) & 0x000000ff;
+
+    long width = imageWidth;
+    header[18] = width & 0x000000ff;
+    header[19] = (width >> 8) &0x000000ff;
+    header[20] = (width >> 16) &0x000000ff;
+    header[21] = (width >> 24) &0x000000ff;
+
+    long height = imageHeight;
+    header[22] = height &0x000000ff;
+    header[23] = (height >> 8) &0x000000ff;
+    header[24] = (height >> 16) &0x000000ff;
+    header[25] = (height >> 24) &0x000000ff;
+
+    char fname_bmp[128];
+    sprintf(fname_bmp, "%s", filename);
+
+    FILE *fp;
+    if (!(fp = fopen(fname_bmp, "wb")))
+        return -1;
+
+    fwrite(header, sizeof(unsigned char), 54, fp);
+    fwrite(image, sizeof(unsigned char), (size_t)(long)imageWidth * imageHeight * 4, fp);
+
+    fclose(fp);
+    return 0;
 }
 
 

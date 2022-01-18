@@ -29,6 +29,8 @@
 #define YV12 0
 #define NV21 1
 #define YUYV 2
+#define MJPEG 3
+#define H264 4
 
 
 typedef struct {
@@ -80,7 +82,7 @@ public:
     int GrabRawFrame(void *raw_base);
     void Convert(void *raw_base,
 		 void *preview_base,
-		 unsigned int ppnum);
+		 unsigned int rawSize);
 
     void setSurface(ANativeWindow *window);
 
@@ -88,7 +90,9 @@ public:
     void renderVideo(unsigned char *preview);
 
     void setListener(JavaCallHelper * listener);
-    void sendDataToJava(unsigned char *raw);
+    void sendDataToJava(unsigned char *raw, int dataSize);
+
+	int bmp_write(unsigned char *image, int imageWidth, int imageHeight, const char *filename);
 
 private:
     int fd;

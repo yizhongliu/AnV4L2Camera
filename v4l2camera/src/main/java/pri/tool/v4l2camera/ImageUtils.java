@@ -15,6 +15,9 @@ public class ImageUtils {
     //YUV422  arranged in "YUYV" format
     public final static int YUYV = 2;
 
+    public final static int MJPEG = 3;
+    public final static int H264 = 4;
+
 
     /**
      * Returns a transformation matrix from one reference frame into another.

@@ -101,6 +101,14 @@ public class V4L2Camera{
         dataCallback = null;
     }
 
+    public ArrayList<Parameter> getCameraParameters() {
+        return native_getParameters();
+    }
+
+    public int setPreviewParameter(int width, int height, int pixFormat) {
+        return native_setPreviewSize(width, height, pixFormat);
+    }
+
     public Size chooseOptimalSize(int desireWidth, int desireHeight) {
 
         ArrayList<Parameter> parameters = native_getParameters();
